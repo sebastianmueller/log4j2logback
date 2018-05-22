@@ -34,6 +34,9 @@
                     <xsl:when test="@class = 'org.apache.log4j.net.SMTPAppender'">ch.qos.logback.classic.net.SMTPAppender</xsl:when>
                     <xsl:when test="@class = 'org.apache.log4j.net.SocketAppender'">ch.qos.logback.classic.net.SocketAppender</xsl:when>
                     <xsl:when test="@class = 'org.apache.log4j.net.SyslogAppender'">ch.qos.logback.classic.net.SyslogAppender</xsl:when>
+                    <xsl:when test="@class = 'org.apache.log4j.RollingFileAppender'">ch.qos.logback.core.rolling.RollingFileAppender</xsl:when>
+                    <xsl:when test="@class = 'org.apache.log4j.DailyRollingFileAppender'">ch.qos.logback.core.rolling.RollingFileAppender</xsl:when>
+                    <xsl:when test="@class = 'org.apache.log4j.AsyncAppender'">ch.qos.logback.classic.AsyncAppender</xsl:when>
                     <xsl:otherwise>
                         <xsl:message terminate="yes">Unknown appender class: <xsl:value-of select="@class"/></xsl:message>
                     </xsl:otherwise>
@@ -42,6 +45,7 @@
             <xsl:apply-templates select="param"/>
             <xsl:apply-templates select="layout"/>
             <xsl:apply-templates select="filter"/>
+            <xsl:apply-templates select="appender-ref"/>
         </appender>
         <xsl:call-template name="newline"/>
     </xsl:template>
@@ -53,6 +57,31 @@
             </xsl:when>
             <xsl:when test="@name = 'BufferSize'">
                 <!-- ignoring this parameter -->
+            </xsl:when>
+            <xsl:when test="@name = 'MaxBackupIndex'">
+                <!-- ignoring this parameter, it is handled together with 'MaxFileSize' -->
+            </xsl:when>
+            <xsl:when test="@name = 'MaxFileSize' or @name = 'DatePattern'">
+                <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+                    <xsl:if test="../param[@name = 'MaxFileSize']">
+                        <maxFileSize>
+                            <xsl:value-of select="../param[@name = 'MaxFileSize']/@value"/>
+                        </maxFileSize>
+                    </xsl:if>
+                    <xsl:if test="../param[@name = 'MaxBackupIndex']">
+                        <maxHistory>
+                            <xsl:value-of select="../param[@name = 'MaxBackupIndex']/@value"/>
+                        </maxHistory>
+                    </xsl:if>
+                    <xsl:choose>
+                      <xsl:when test="../param[@name = 'DatePattern']">
+                        <fileNamePattern><xsl:value-of select="../param[@name = 'File']/@value"/>%d{<xsl:value-of select="../param[@name = 'DatePattern']/@value"/>}.%i</fileNamePattern>
+                      </xsl:when>
+                      <xsl:otherwise>
+                        <fileNamePattern><xsl:value-of select="../param[@name = 'File']/@value"/>.%d.%i</fileNamePattern>
+                      </xsl:otherwise>
+                    </xsl:choose>
+              </rollingPolicy>
             </xsl:when>
             <xsl:otherwise>
                 <!-- lowercasing the first character -->
@@ -70,7 +99,7 @@
         <xsl:choose>
             <xsl:when test="@class = 'org.apache.log4j.PatternLayout'">
                 <xsl:choose>
-                    <xsl:when test="../@class = 'org.apache.log4j.ConsoleAppender'">
+                    <xsl:when test="../@class = 'org.apache.log4j.ConsoleAppender' or ../@class = 'org.apache.log4j.RollingFileAppender' or ../@class = 'org.apache.log4j.DailyRollingFileAppender'">
                         <encoder>
                             <pattern><xsl:value-of select="param[@name = 'ConversionPattern']/@value"/></pattern>
                         </encoder>
@@ -134,7 +163,7 @@
     <xsl:template match="root">
         <xsl:call-template name="newline"/>
         <root>
-            <xsl:attribute name="level"><xsl:value-of select="level/@value"/></xsl:attribute>
+            <xsl:attribute name="level"><xsl:value-of select="level/@value"/><xsl:value-of select="priority/@value"/></xsl:attribute>
             <xsl:apply-templates select="appender-ref"/>
             <xsl:apply-templates select="comment()"/>
         </root>
